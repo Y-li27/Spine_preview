@@ -23,15 +23,16 @@
 <h1>CGSS カードSpineアニメーションプレビュー（データバージョン 3.6）</h1>
 <p>使い方：<br>
 <b>カードSpineアニメーション</b>（キャラクターディレクトリ\カードSpineアニメーション\spine以下）：<br>
-  ボーンファイルは5つすべて選択してください。<br>
-（SP3S{カードID}_bg / _chara / _eff1 / _eff2 / _fgの .skelまたは .skel.asset）。<br>
+  骨格ファイルは5つすべて選択してください。<br>
+（SP3S{カードID}_bg / _chara / _eff1 / _eff2 / _fgの .skelまたは .skel.asset。<br>
+  タイトルなどは SP3T{ID}_bg.skel.bytes のように .skel.bytes の5つ）。<br>
   ページ側で自動的にJSONへ変換します。<br>
-  AtlasはSP3S{カードID}_tex.atlas（.asset）を選択し、<br>
+  AtlasはSP3S{カードID}_tex.atlas（.asset）、または SP3T{ID}_tex.atlas.txt を選択し、<br>
   テクスチャはtex.png + tex_A8.pngを選択してください<br>
 （A8は透明チャンネルで、自動的に合成して黒い縁を除去します）。<br>
 
 <b>Spineキャラクター</b>（キャラクターディレクトリ\spine以下）：<br>
-  ボーンファイルはSPSprachen_s.json / SPSprachen_N.jsonを選択してください。<br>
+  骨格ファイルはSPSprachen_s.json / SPSprachen_N.jsonを選択してください。<br>
 （<b>旧カードはN、新しいカードはs</b>。<br>
   判断できない場合は両方試し、頭身が正常な方が正しいデータです）。<br>
   atlasはSPC{カードID}.atlas（.asset）を選択し、<br>
@@ -42,18 +43,18 @@
 レイヤーの順序は自動的に設定されます：bg → eff2 → chara → eff1 → fg。</p>
 
 <div class="row">
-  <label class="file-lbl">ボーン .skel/.asset/.json：</label>
-  <input type="file" id="f_skel" accept=".skel,.skel.asset,.json,.asset" multiple>
+  <label class="file-lbl">骨格 .skel/.asset/.json：</label>
+  <input type="file" id="f_skel" accept=".skel,.skel.asset,.skel.bytes,.bytes,.json,.asset" multiple>
 </div>
 
 <div class="row">
   <label class="file-lbl">Atlas .atlas：</label>
-  <input type="file" id="f_atlas" accept=".atlas,.atlas.asset,.asset">
+  <input type="file" id="f_atlas" accept=".atlas,.atlas.txt,.txt,.atlas.asset,.asset">
 </div>
 
 <div class="row">
   <label class="file-lbl">テクスチャ .png：</label>
-  <input type="file" id="f_png" accept=".png,application/octet-stream" multiple>
+  <input type="file" id="f_png" accept=".png" multiple>
 </div>
 
 <div class="row" id="anim_rows"></div>
@@ -136,7 +137,7 @@ var expGL = null, expGLCanvas = null;
 
 function msg(s){ document.getElementById('msg').textContent = s; }
 
-// Spineキャラクター（SPSprachen）のボーンにflipを適用して左右反転を制御。
+// Spineキャラクター（SPSprachen）の骨格にflipを適用して左右反転を制御。
 // チェックあり = scaleX -1（デフォルト）、チェックなし = データ本来のscaleX 1。
 function applyPetitFlip(s){
   if (s.flipBone === undefined) s.flipBone = s.skeleton.findBone('flip') || null;
@@ -163,8 +164,8 @@ document.getElementById('f_skel').addEventListener('change', function(e){
           var obj = JSON.parse(text);
           if (!obj || !obj.bones) throw new Error('not skeleton json');
         } catch (e1) {
-          msg('ファイル「' + f.name + '」はボーンファイルではありません（JSONの解析に失敗しました）。\n' +
-'Spineキャラクターの場合は、ボーンに SPSprachen_s.json、Atlasに SPC{id}.atlas（.asset）、\n' +
+          msg('ファイル「' + f.name + '」は骨格ファイルではありません（JSONの解析に失敗しました）。\n' +
+'Spineキャラクターの場合は、骨格に SPSprachen_s.json、Atlasに SPC{id}.atlas（.asset）、\n' +
 'テクスチャに SPC{id}.png を選択してください。');
           if (--pending === 0) { finishSkelLoad(files.length); }
           return;
@@ -198,7 +199,7 @@ function finishSkelLoad(n){
       for (var i = 0; i < sk.bones.length; i++)
         if (sk.bones[i].name === 'shadow'){ shadow = sk.bones[i]; break; }
       var isN = shadow && typeof shadow.scaleX === 'number' && Math.abs(shadow.scaleX) < 1;
-      hint = isN ? '（N のボーンを検出：古いカード用）' : ' S のボーンを検出：新しいカード用';
+      hint = isN ? '（N 本のボーンを検出：古いカード用）' : 's 本のボーンを検出：新しいカード用';
     }
   } catch(e){}
   msg('選択済みのボーン' + n + '個（レイヤー順にソート済み）' + hint);

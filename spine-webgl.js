@@ -219,6 +219,7 @@
           this._push(tex2, world4[qi], world4[qi + 1], uvs2[qi], uvs2[qi + 1], cr, cg, cb, ca);
         }
       }
+      }
     }
     this._flush();
   };

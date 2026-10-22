@@ -28,7 +28,7 @@
     'varying vec2 vUV;' +
     'varying vec4 vColor;' +
     'uniform sampler2D uTex;' +
-    // 输出预乘颜色，与 canvas 'lighter'/'source-over' 的合成规则一致
+    // 乗算済みアルファ (Premultiplied Alpha) のカラーを出力。Canvas の 'lighter' / 'source-over' の合成規則と一致
     'void main(){ vec4 t = texture2D(uTex, vUV);' +
     'float a = t.a * vColor.a;' +
     'gl_FragColor = vec4(t.rgb * vColor.rgb * a, a); }';
@@ -57,7 +57,7 @@
       preserveDrawingBuffer: !!opts.preserveDrawingBuffer,
       antialias: false
     });
-    if (!this.gl) throw new Error('WebGL 不可用');
+    if (!this.gl) throw new Error('WebGL 使用不可');
     var gl = this.gl;
     this.program = gl.createProgram();
     gl.attachShader(this.program, compileShader(gl, gl.VERTEX_SHADER, VERT_SRC));
@@ -75,12 +75,9 @@
     this.texCache = {};
     this.width = canvas.width || 1;
     this.height = canvas.height || 1;
-    this.triangleRendering = true; // 兼容旧调用
-    this.depthSort = false;
+    this.triangleRendering = true; // 古い呼び出しとの互換性
     this._scale = 1; this._tx = 0; this._ty = 0;
     this._batch = [];
-    this._queue = [];
-    this._seq = 0;
   }
 
   CGSSWebGLRenderer.prototype.resize = function (w, h) {
@@ -124,46 +121,6 @@
     var nx = sx / this.width * 2 - 1;
     var ny = 1 - sy / this.height * 2;
     this._batch.push(nx, ny, u, v, cr, cg, cb, ca);
-  };
-
-  CGSSWebGLRenderer.prototype.beginDepth = function () {
-    this._queue = [];
-    this._seq = 0;
-  };
-
-  CGSSWebGLRenderer.prototype._queueTri = function (tex, blend, verts) {
-    var y = (verts[1] + verts[9] + verts[17]) / 3;
-    this._queue.push({ tex: tex, blend: blend, y: y, seq: this._seq++, v: verts });
-  };
-
-  CGSSWebGLRenderer.prototype.endDepth = function () {
-    var q = this._queue;
-    if (!q.length) return;
-    q.sort(function (a, b) {
-      if (a.y !== b.y) return a.y - b.y;
-      return a.seq - b.seq;
-    });
-    var gl = this.gl;
-    gl.enable(gl.BLEND);
-    gl.disable(gl.DEPTH_TEST);
-    gl.useProgram(this.program);
-    var currentTex = null, currentBlend = -1;
-    for (var i = 0; i < q.length; i++) {
-      var tri = q[i];
-      if (currentTex !== tri.tex || currentBlend !== tri.blend) {
-        this._flush();
-        currentTex = tri.tex;
-        currentBlend = tri.blend;
-        if (tri.tex) gl.bindTexture(gl.TEXTURE_2D, tri.tex);
-        this._setBlend(tri.blend);
-      }
-      var v = tri.v;
-      for (var k = 0; k < 24; k += 8) {
-        this._push(tri.tex, v[k], v[k + 1], v[k + 2], v[k + 3], v[k + 4], v[k + 5], v[k + 6], v[k + 7]);
-      }
-    }
-    this._flush();
-    this._queue = [];
   };
 
   CGSSWebGLRenderer.prototype._flush = function () {
@@ -242,18 +199,10 @@
         this._world = world;
         mesh.computeWorldVertices(slot, 0, wl, world, 0, 2);
         var uvs = mesh.uvs, tris = mesh.triangles;
-        for (var t = 0; t < tris.length; t += 3) {
-          var i0 = tris[t] * 2, i1 = tris[t + 1] * 2, i2 = tris[t + 2] * 2;
-          var tri = [
-            world[i0], world[i0 + 1], uvs[i0], uvs[i0 + 1], cr, cg, cb, ca,
-            world[i1], world[i1 + 1], uvs[i1], uvs[i1 + 1], cr, cg, cb, ca,
-            world[i2], world[i2 + 1], uvs[i2], uvs[i2 + 1], cr, cg, cb, ca
-          ];
-          if (this.depthSort) this._queueTri(tex, blend, tri);
-          else {
-            beginTex(tex, blend);
-            for (var p = 0; p < 24; p += 8) this._push(tex, tri[p], tri[p + 1], tri[p + 2], tri[p + 3], tri[p + 4], tri[p + 5], tri[p + 6], tri[p + 7]);
-          }
+        beginTex(tex, blend);
+        for (var t = 0; t < tris.length; t++) {
+          var vi = tris[t] * 2;
+          this._push(tex, world[vi], world[vi + 1], uvs[tris[t] * 2], uvs[tris[t] * 2 + 1], cr, cg, cb, ca);
         }
       } else if (attachment instanceof spine.RegionAttachment) {
         var region = attachment;
@@ -263,19 +212,11 @@
         this._world4 = world4;
         region.computeWorldVertices(slot.bone, world4, 0, 2);
         var uvs2 = region.uvs;
+        beginTex(tex2, blend);
         var quad = [0, 1, 2, 0, 2, 3];
-        for (var q = 0; q < quad.length; q += 3) {
-          var a = quad[q] * 2, b = quad[q + 1] * 2, c = quad[q + 2] * 2;
-          var tri2 = [
-            world4[a], world4[a + 1], uvs2[a], uvs2[a + 1], cr, cg, cb, ca,
-            world4[b], world4[b + 1], uvs2[b], uvs2[b + 1], cr, cg, cb, ca,
-            world4[c], world4[c + 1], uvs2[c], uvs2[c + 1], cr, cg, cb, ca
-          ];
-          if (this.depthSort) this._queueTri(tex2, blend, tri2);
-          else {
-            beginTex(tex2, blend);
-            for (var p2 = 0; p2 < 24; p2 += 8) this._push(tex2, tri2[p2], tri2[p2 + 1], tri2[p2 + 2], tri2[p2 + 3], tri2[p2 + 4], tri2[p2 + 5], tri2[p2 + 6], tri2[p2 + 7]);
-          }
+        for (var q = 0; q < quad.length; q++) {
+          var qi = quad[q] * 2;
+          this._push(tex2, world4[qi], world4[qi + 1], uvs2[qi], uvs2[qi + 1], cr, cg, cb, ca);
         }
       }
     }
@@ -284,4 +225,3 @@
 
   global.CGSSWebGLRenderer = CGSSWebGLRenderer;
 })(typeof window !== 'undefined' ? window : globalThis);
-Grok finished responding

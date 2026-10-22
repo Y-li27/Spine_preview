@@ -70,6 +70,9 @@
   <label>左右反転（flip）</label>
   <input type="checkbox" id="chk_flip" checked>
 
+  <label>足を段に埋め込む</label>
+  <input type="checkbox" id="chk_depth">
+
   <label>背景色</label>
   <input type="color" id="bg_color" value="#222222">
 
@@ -386,6 +389,8 @@ function loop(t){
   if (glRenderer) {
     glRenderer.setTransform(fit.scale, fit.tx, fit.ty);
     glRenderer.clear(bg[0], bg[1], bg[2], 1);
+    glRenderer.depthSort = document.getElementById('chk_depth').checked;
+    if (glRenderer.depthSort) glRenderer.beginDepth();
     skelList.forEach(function(s){
       if (s.check && !s.check.checked) return;
       if (advance) s.state.update(dt * sp);
@@ -394,6 +399,7 @@ function loop(t){
       s.skeleton.updateWorldTransform();
       glRenderer.draw(s.skeleton);
     });
+    if (glRenderer.depthSort) glRenderer.endDepth();
     ctx.setTransform(1,0,0,1,0,0);
     ctx.fillStyle = bgHex();
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -536,6 +542,8 @@ function exportMP4(){
     if (expGL) {
       expGL.setTransform(scale, tx, ty);
       expGL.clear(bg[0], bg[1], bg[2], 1);
+      expGL.depthSort = document.getElementById('chk_depth').checked;
+      if (expGL.depthSort) expGL.beginDepth();
       skelList.forEach(function(sk){
         if (sk.check && !sk.check.checked) return;
         var an = findAnim(sk);
@@ -547,6 +555,7 @@ function exportMP4(){
         sk.skeleton.updateWorldTransform();
         expGL.draw(sk.skeleton);
       });
+      if (expGL.depthSort) expGL.endDepth();
       ctx.setTransform(1,0,0,1,0,0);
       ctx.fillStyle = hex;
       ctx.fillRect(0, 0, w, h);

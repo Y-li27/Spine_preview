@@ -11,7 +11,7 @@
   .file-lbl { width:240px; }
   #anim_rows .anim-line { display:flex; align-items:center; gap:8px; margin:4px 0; }
   #anim_rows .anim-line label { flex:1; min-width:0; margin-right:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #anim_rows select { width:220px; flex:none; }
+  #anim_rows .anim-line button { flex:none; padding:2px 8px; }
   .controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
   .controls label { width:auto; margin-right:4px; }
   canvas { background:transparent; border:1px solid #555; display:block; margin-top:12px; max-width:100%; }
@@ -58,6 +58,7 @@
 </div>
 
 <div class="row" id="anim_rows"></div>
+<p style="margin:4px 0 8px;color:#aaa;">上の行ほど奥、下の行ほど手前です。▲▼で入れ替えてください。</p>
 
 <div class="row controls">
   <button id="btn_play">再生</button>
@@ -296,7 +297,7 @@ function tryInit(){
 
     var rows = document.getElementById('anim_rows');
     rows.innerHTML = '';
-    skelList.forEach(function(s){
+    function addLayerRow(s){
       var lab = document.createElement('label');
       lab.textContent = s.name + '：';
       var sel = document.createElement('select');
@@ -309,14 +310,30 @@ function tryInit(){
         if (s.state && sel.value) s.state.setAnimation(0, sel.value, true);
       });
       var chk = document.createElement('input');
-      chk.type = 'checkbox'; chk.checked = true;
+      chk.type = 'checkbox'; chk.checked = s.check ? s.check.checked : true;
       s.check = chk;
+      var up = document.createElement('button');
+      up.type = 'button'; up.textContent = '▲';
+      var down = document.createElement('button');
+      down.type = 'button'; down.textContent = '▼';
       var line = document.createElement('div');
       line.className = 'anim-line';
+      function move(dir){
+        var i = skelList.indexOf(s);
+        var j = i + dir;
+        if (i < 0 || j < 0 || j >= skelList.length) return;
+        var tmp = skelList[i]; skelList[i] = skelList[j]; skelList[j] = tmp;
+        if (dir < 0) rows.insertBefore(line, line.previousElementSibling);
+        else rows.insertBefore(line.nextElementSibling, line);
+      }
+      up.onclick = function(){ move(-1); };
+      down.onclick = function(){ move(1); };
       rows.appendChild(line);
+      line.appendChild(up); line.appendChild(down);
       line.appendChild(lab); line.appendChild(sel); line.appendChild(chk);
-      if (s.data.animations.length) s.state.setAnimation(0, s.data.animations[0].name, true);
-    });
+      if (s.data.animations.length && !(s.state.tracks && s.state.tracks[0])) s.state.setAnimation(0, s.data.animations[0].name, true);
+    }
+    skelList.forEach(addLayerRow);
 
     //背景あり（カードアニメ）: 各レイヤーの静的 setup バウンディングボックスでフィットさせ、背景は画面いっぱいに敷き詰める（エフェクトの範囲が広いので、エフェクト基準ではスケーリングしない）。
     //背景なし（キャラ単体）: アニメ全体のバウンディングボックスでフィットさせて、歩いても画面外にはみ出さないようにする。

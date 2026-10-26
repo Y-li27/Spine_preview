@@ -29,6 +29,7 @@
   AtlasはSP3S{カードID}_tex.atlas（.asset）、または SP3T{ID}_tex.atlas.txt を選択し、<br>
   テクスチャはtex.png + tex_A8.pngを選択してください<br>
 （A8は透明チャンネルで、自動的に合成して黒い縁を除去します）。<br>
+  Android では「写真」から選ぶと 758.png のように名前が変わります。「ファイル」から選んでください。1枚だけなら、名前が違ってもその画像を使います。<br>
 
 <b>Spineキャラクター</b>（キャラクターディレクトリ\spine以下）：<br>
   骨格ファイルはSPSprachen_s.json / SPSprachen_N.jsonを選択してください。<br>
@@ -53,7 +54,7 @@
 
 <div class="row">
   <label class="file-lbl">テクスチャ .png：</label>
-  <input type="file" id="f_png" accept=".png" multiple>
+  <input type="file" id="f_png" accept="*/*" multiple>
 </div>
 
 <div class="row" id="anim_rows"></div>
@@ -114,6 +115,23 @@ function bgRgb(){
 }
 function texKey(name){
   return String(name || '').replace(/\\/g, '/').split('/').pop().normalize('NFC').trim();
+}
+function colorTexNames(){
+  return Object.keys(pngMap).filter(function(n){ return !/_A8(?:\.png)?$/i.test(texKey(n).replace(/\.png$/i, '')); });
+}
+function looksGray(img){
+  var w = Math.min(24, img.naturalWidth || img.width), h = Math.min(24, img.naturalHeight || img.height);
+  if (!w || !h) return false;
+  var c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  var cx = c.getContext('2d');
+  cx.drawImage(img, 0, 0, w, h);
+  var d = cx.getImageData(0, 0, w, h).data, color = 0, n = 0;
+  for (var i = 0; i < d.length; i += 16) {
+    if (Math.abs(d[i] - d[i + 1]) + Math.abs(d[i] - d[i + 2]) > 18) color++;
+    n++;
+  }
+  return n > 0 && color / n < 0.08;
 }
 function findTex(path){
   var key = texKey(path);
@@ -230,23 +248,35 @@ document.getElementById('f_png').addEventListener('change', function(e){
 
 // CGSS は RGB のメインテクスチャ + 独立した A8 透過チャンネルの構成で、この 2 枚を合成して本来の RGBA にし、黒い下地や黒フチを取り除きます
 function buildComposite(){
-  Object.keys(pngMap).forEach(function(k){
+  var names = Object.keys(pngMap);
+  names.forEach(function(k){
     var m = /^(.*)_A8\.png$/i.exec(texKey(k));
     if (!m) return;
     var rgbName = findTex(m[1] + '.png');
     if (!rgbName) return;
-    var rgb = pngMap[rgbName], a8 = pngMap[k];
-    var c = document.createElement('canvas');
-    c.width = rgb.naturalWidth;
-    c.height = rgb.naturalHeight;
-    var cx = c.getContext('2d');
-    cx.drawImage(rgb, 0, 0, c.width, c.height);
-    cx.globalCompositeOperation = 'destination-in';  // A8 のアルファで RGB を保持
-    cx.drawImage(a8, 0, 0, c.width, c.height);
-    compositeMap[rgbName] = c;
-    compositeMap[texKey(m[1] + '.png')] = c;
-    msg('合成済みアルファ：' + rgbName + ' + ' + k);
+    paintComposite(rgbName, k);
   });
+  if (!Object.keys(compositeMap).length && names.length === 2) {
+    var a = pngMap[names[0]], b = pngMap[names[1]];
+    var aw = a.naturalWidth || a.width, ah = a.naturalHeight || a.height;
+    var bw = b.naturalWidth || b.width, bh = b.naturalHeight || b.height;
+    if (aw === bw && ah === bh) {
+      var ag = looksGray(a), bg = looksGray(b);
+      if (ag !== bg) paintComposite(ag ? names[1] : names[0], ag ? names[0] : names[1]);
+    }
+  }
+}
+function paintComposite(rgbName, a8Name){
+  var rgb = pngMap[rgbName], a8 = pngMap[a8Name];
+  var c = document.createElement('canvas');
+  c.width = rgb.naturalWidth || rgb.width;
+  c.height = rgb.naturalHeight || rgb.height;
+  var cx = c.getContext('2d');
+  cx.drawImage(rgb, 0, 0, c.width, c.height);
+  cx.globalCompositeOperation = 'destination-in';
+  cx.drawImage(a8, 0, 0, c.width, c.height);
+  compositeMap[rgbName] = c;
+  msg('合成済みアルファ：' + rgbName + ' + ' + a8Name);
 }
 
 function tryInit(){
@@ -259,6 +289,10 @@ function tryInit(){
     var loader = function(path){
       var key = texKey(path);
       var hit = findTex(key);
+      if (!hit) {
+        var colors = colorTexNames();
+        if (colors.length === 1) hit = colors[0];
+      }
       if (hit && compositeMap[hit]) return new spine.canvas.CanvasTexture(compositeMap[hit]);
       if (compositeMap[key]) return new spine.canvas.CanvasTexture(compositeMap[key]);
       var img = hit ? pngMap[hit] : null;

@@ -54,7 +54,7 @@
 
 <div class="row">
   <label class="file-lbl">テクスチャ .png：</label>
-  <input type="file" id="f_png" accept="*/*" multiple>
+  <input type="file" id="f_png" accept="application/octet-stream" multiple>
 </div>
 
 <div class="row" id="anim_rows"></div>
@@ -257,13 +257,8 @@ function buildComposite(){
     paintComposite(rgbName, k);
   });
   if (!Object.keys(compositeMap).length && names.length === 2) {
-    var a = pngMap[names[0]], b = pngMap[names[1]];
-    var aw = a.naturalWidth || a.width, ah = a.naturalHeight || a.height;
-    var bw = b.naturalWidth || b.width, bh = b.naturalHeight || b.height;
-    if (aw === bw && ah === bh) {
-      var ag = looksGray(a), bg = looksGray(b);
-      if (ag !== bg) paintComposite(ag ? names[1] : names[0], ag ? names[0] : names[1]);
-    }
+    var ag = looksGray(pngMap[names[0]]), bg = looksGray(pngMap[names[1]]);
+    if (ag !== bg) paintComposite(ag ? names[1] : names[0], ag ? names[0] : names[1]);
   }
 }
 function paintComposite(rgbName, a8Name){
@@ -291,7 +286,12 @@ function tryInit(){
       var hit = findTex(key);
       if (!hit) {
         var colors = colorTexNames();
-        if (colors.length === 1) hit = colors[0];
+        var composed = colors.filter(function(n){ return compositeMap[n]; });
+        if (composed.length) hit = composed[0];
+        else if (colors.length) {
+          var vivid = colors.filter(function(n){ return !looksGray(pngMap[n]); });
+          hit = (vivid.length ? vivid : colors)[0];
+        } else hit = Object.keys(pngMap)[0];
       }
       if (hit && compositeMap[hit]) return new spine.canvas.CanvasTexture(compositeMap[hit]);
       if (compositeMap[key]) return new spine.canvas.CanvasTexture(compositeMap[key]);

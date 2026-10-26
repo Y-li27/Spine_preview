@@ -153,6 +153,12 @@
   <input type="checkbox" id="chk_flip" checked>
   <label>背景色</label>
   <input type="color" id="bg_color" value="#222222">
+  <label>解像度</label>
+  <select id="res_scale" title="プレビューと MP4 のピクセル数。テクスチャより大きくしても、それ以上はシャープになりません">
+    <option value="1">標準</option>
+    <option value="2">2倍</option>
+    <option value="3">3倍</option>
+  </select>
   <label>書き出し</label>
   <select id="export_fps">
     <option value="30">30fps</option>
@@ -228,6 +234,14 @@ function findTex(path){
     if (n.length > low.length && n.endsWith(low)) return names[i];
   }
   return null;
+}
+function resScale(){
+  var el = document.getElementById('res_scale');
+  var n = el ? parseFloat(el.value) : 1;
+  return (n === 2 || n === 3) ? n : 1;
+}
+function viewSide(){
+  return Math.min(4096, Math.round(1400 * resScale()));
 }
 function applyBgStyle(){
   var cv = document.getElementById('cv');
@@ -390,8 +404,8 @@ function tryInit(){
     var att = new spine.AtlasAttachmentLoader(atlas);
     var j = new spine.SkeletonJson(att);
 
-    canvas.width = 1400;
-    canvas.height = 1400;
+    canvas.width = viewSide();
+    canvas.height = canvas.width;
     ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,canvas.width,canvas.height);
     offCanvas = document.createElement('canvas');
@@ -605,7 +619,8 @@ function exportMP4(){
   if (!window.VideoEncoder || !window.VideoFrame){ msg('現在のブラウザは WebCodecs に対応していないため、MP4 を書き出せません（Chrome または Edge を使ってください）'); return; }
   if (typeof Mp4Muxer === 'undefined'){ msg('mp4-muxer.min.js がありません。preview.html と同じフォルダに置いてください'); return; }
   var b = exportBounds();
-  var w = Math.round(b.maxX - b.minX), h = Math.round(b.maxY - b.minY);
+  var scale = resScale();
+  var w = Math.round((b.maxX - b.minX) * scale), h = Math.round((b.maxY - b.minY) * scale);
   var maxDim = 4096;
   var sc = Math.min(1, maxDim / Math.max(w, h));
   w = Math.max(2, Math.floor(w * sc)); h = Math.max(2, Math.floor(h * sc));
@@ -751,6 +766,21 @@ function exportMP4(){
 
 document.getElementById('bg_color').addEventListener('input', function(){
   applyBgStyle();
+  recolor = true;
+});
+document.getElementById('res_scale').addEventListener('change', function(){
+  var canvas = document.getElementById('cv');
+  if (!canvas || !canvas.width) return;
+  var prev = canvas.width;
+  var side = viewSide();
+  canvas.width = side;
+  canvas.height = side;
+  var k = side / prev;
+  fit.scale *= k;
+  fit.tx *= k;
+  fit.ty *= k;
+  if (glRenderer) glRenderer.resize(side, side);
+  if (offCanvas) { offCanvas.width = side * SS; offCanvas.height = side * SS; }
   recolor = true;
 });
 applyBgStyle();

@@ -28,7 +28,7 @@
     'varying vec2 vUV;' +
     'varying vec4 vColor;' +
     'uniform sampler2D uTex;' +
-    // 乗算済みアルファ (Premultiplied Alpha) のカラーを出力。Canvas の 'lighter' / 'source-over' の合成規則と一致
+    // 输出预乘颜色，与 canvas 'lighter'/'source-over' 的合成规则一致
     'void main(){ vec4 t = texture2D(uTex, vUV);' +
     'float a = t.a * vColor.a;' +
     'gl_FragColor = vec4(t.rgb * vColor.rgb * a, a); }';
@@ -57,7 +57,7 @@
       preserveDrawingBuffer: !!opts.preserveDrawingBuffer,
       antialias: false
     });
-    if (!this.gl) throw new Error('WebGL 使用不可');
+    if (!this.gl) throw new Error('WebGL 不可用');
     var gl = this.gl;
     this.program = gl.createProgram();
     gl.attachShader(this.program, compileShader(gl, gl.VERTEX_SHADER, VERT_SRC));
@@ -75,7 +75,7 @@
     this.texCache = {};
     this.width = canvas.width || 1;
     this.height = canvas.height || 1;
-    this.triangleRendering = true; // 古い呼び出しとの互換性
+    this.triangleRendering = true; // 兼容旧调用
     this._scale = 1; this._tx = 0; this._ty = 0;
     this._batch = [];
   }
@@ -111,6 +111,17 @@
     if (!img.__cgssTexId) img.__cgssTexId = Math.random().toString(36).slice(2);
     this.texCache[img.__cgssTexId] = tex;
     return tex;
+  };
+
+  CGSSWebGLRenderer.prototype._expand = function (x0, y0, u0, v0, x1, y1, u1, v1, x2, y2, u2, v2) {
+    var pad = 0.85 / (Math.abs(this._scale) || 1);
+    var cx = (x0 + x1 + x2) / 3, cy = (y0 + y1 + y2) / 3;
+    var cu = (u0 + u1 + u2) / 3, cv = (v0 + v1 + v2) / 3;
+    function g(x, y, u, v) {
+      var dx = x - cx, dy = y - cy, len = Math.sqrt(dx * dx + dy * dy) || 1;
+      return [x + dx / len * pad, y + dy / len * pad, cu + (u - cu) * 0.998, cv + (v - cv) * 0.998];
+    }
+    return [g(x0, y0, u0, v0), g(x1, y1, u1, v1), g(x2, y2, u2, v2)];
   };
 
   CGSSWebGLRenderer.prototype._push = function (tex, x, y, u, v, cr, cg, cb, ca) {
@@ -200,9 +211,13 @@
         mesh.computeWorldVertices(slot, 0, wl, world, 0, 2);
         var uvs = mesh.uvs, tris = mesh.triangles;
         beginTex(tex, blend);
-        for (var t = 0; t < tris.length; t++) {
-          var vi = tris[t] * 2;
-          this._push(tex, world[vi], world[vi + 1], uvs[tris[t] * 2], uvs[tris[t] * 2 + 1], cr, cg, cb, ca);
+        for (var t = 0; t < tris.length; t += 3) {
+          var i0 = tris[t] * 2, i1 = tris[t + 1] * 2, i2 = tris[t + 2] * 2;
+          var ex = this._expand(
+            world[i0], world[i0 + 1], uvs[i0], uvs[i0 + 1],
+            world[i1], world[i1 + 1], uvs[i1], uvs[i1 + 1],
+            world[i2], world[i2 + 1], uvs[i2], uvs[i2 + 1]);
+          for (var p = 0; p < 3; p++) this._push(tex, ex[p][0], ex[p][1], ex[p][2], ex[p][3], cr, cg, cb, ca);
         }
       } else if (attachment instanceof spine.RegionAttachment) {
         var region = attachment;
@@ -214,11 +229,14 @@
         var uvs2 = region.uvs;
         beginTex(tex2, blend);
         var quad = [0, 1, 2, 0, 2, 3];
-        for (var q = 0; q < quad.length; q++) {
-          var qi = quad[q] * 2;
-          this._push(tex2, world4[qi], world4[qi + 1], uvs2[qi], uvs2[qi + 1], cr, cg, cb, ca);
+        for (var q = 0; q < quad.length; q += 3) {
+          var a = quad[q] * 2, b = quad[q + 1] * 2, c = quad[q + 2] * 2;
+          var ex2 = this._expand(
+            world4[a], world4[a + 1], uvs2[a], uvs2[a + 1],
+            world4[b], world4[b + 1], uvs2[b], uvs2[b + 1],
+            world4[c], world4[c + 1], uvs2[c], uvs2[c + 1]);
+          for (var p2 = 0; p2 < 3; p2++) this._push(tex2, ex2[p2][0], ex2[p2][1], ex2[p2][2], ex2[p2][3], cr, cg, cb, ca);
         }
-      }
       }
     }
     this._flush();
@@ -226,3 +244,4 @@
 
   global.CGSSWebGLRenderer = CGSSWebGLRenderer;
 })(typeof window !== 'undefined' ? window : globalThis);
+Grokの応答が完了しました

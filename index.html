@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>CGSS カードSpineアニメーションプレビュー（Spine 3.6 / JSON）</title>
+<title>CGSS Spine AnimetionPreview</title>
 <style>
   :root {
     --bg: #12110f;
@@ -115,7 +115,7 @@
 <div class="wrap">
 <header>
   <h1>Spine プレビュー</h1>
-  <p>デレステのカードとタイトルを、ブラウザで再生する。Spine 3.6。</p>
+  <p>CGSS の Spine をブラウザで再生する。</p>
 </header>
 <details>
   <summary>読み込み方</summary>
@@ -124,7 +124,7 @@
     Atlas は SP3S{ID}_tex.atlas、または SP3T{ID}_tex.atlas.txt。テクスチャは tex.png と tex_A8.png。A8 は自動で合成します。<br>
     Android では「写真」から選ぶと 758.png のように名前が変わります。「ファイル」から選んでください。名前が違っても、選んだ画像は使います。<br><br>
     <b>キャラ単体</b>：骨格は SPSprachen_s.json または _N.json（旧カードは N、新しいカードは s）。Atlas は SPC{ID}.atlas、テクスチャは SPC{ID}.png。A8 は不要です。左右が逆なら「左右反転」を切り替えてください。<br><br>
-    レイヤー順は bg → eff2 → chara → eff1 → fg。キャンバスをタップすると全画面になります。
+    レイヤー順は bg → eff2 → chara → eff1 → fg。キャンバスをタップ、クリックすると全画面になります。
   </div>
 </details>
 
@@ -167,7 +167,7 @@
 <div id="msg"></div>
 <div id="stage">
   <canvas id="cv"></canvas>
-  <div class="fs-hint" id="fs_hint">タップで全画面</div>
+  <div class="fs-hint" id="fs_hint">タップ、クリックで全画面</div>
 </div>
 </div>
 
@@ -772,7 +772,7 @@ document.getElementById('btn_export').onclick = exportMP4;
     }
   }
   cv.addEventListener('click', toggleFs);
-  function onFs(){ if (hint) hint.textContent = fullscreenEl() ? 'タップで戻る' : 'タップで全画面'; }
+  function onFs(){ if (hint) hint.textContent = fullscreenEl() ? 'タップ、クリックで戻る' : 'タップ、クリックで全画面'; }
   document.addEventListener('fullscreenchange', onFs);
   document.addEventListener('webkitfullscreenchange', onFs);
 })();

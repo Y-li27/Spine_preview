@@ -6771,6 +6771,17 @@ var spine;
 			};
 			SkeletonRenderer.prototype.drawTriangle = function (img, x0, y0, u0, v0, x1, y1, u1, v1, x2, y2, u2, v2) {
 				var ctx = this.ctx;
+				var m = ctx.getTransform ? ctx.getTransform() : null;
+				var pad = m ? (0.85 / Math.max(Math.abs(m.a), 1e-4)) : 0;
+				if (pad) {
+					var cx = (x0 + x1 + x2) / 3, cy = (y0 + y1 + y2) / 3;
+					var grow = function (x, y) {
+						var dx = x - cx, dy = y - cy, len = Math.sqrt(dx * dx + dy * dy) || 1;
+						return [x + dx / len * pad, y + dy / len * pad];
+					};
+					var p0 = grow(x0, y0), p1 = grow(x1, y1), p2 = grow(x2, y2);
+					x0 = p0[0]; y0 = p0[1]; x1 = p1[0]; y1 = p1[1]; x2 = p2[0]; y2 = p2[1];
+				}
 				u0 *= img.width;
 				v0 *= img.height;
 				u1 *= img.width;
